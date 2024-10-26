@@ -2,73 +2,112 @@ import json
 import threading
 import time
 import tkinter as tk
+from enum import Enum
+from tkinter import ttk
 
 import requests
+
+
+class Stock(Enum):
+    # 纳指ETF
+    NSDK = ("513100", "1")
+    # 平安银行
+    ZGPA = ("000001", "0")
+
+    def __init__(self, stock_code, market_code):
+        self.stock_code = stock_code
+        self.market_code = market_code
+
+
+market_dict = {
+    "0": "SZ",
+    "1": "SH"
+}
+
+
+def get_socket_data(market_code, stock_code):
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) '
+                      'Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0',
+        'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+    }
+    cb = "cb_1729920299632_6004225"
+    url = (
+        f"https://push2.eastmoney.com/api/qt/stock/trends2/get?secid={market_code}.{stock_code}&fields1=f1,f2,f3,"
+        f"f4,f5,f6,f7,f8,f9,f10,f11,f12,f13&fields2=f51,f52,f53,f54,f55,f56,f57,"
+        f"f58&ut=fa5fd1943c7b386f172d6893dbfba10b&iscr=0&cb={cb}&isqhquote=&{cb}={cb}")
+    response = requests.get(url, headers=headers)
+    # 模拟从API获取JSON数据（替换为实际API URL）
+    if response.status_code == 200:
+        json_string = response.text.split('(', 1)[1].rsplit(')', 1)[0]
+        json_obj = json.loads(json_string)
+
+        data = json_obj["data"]
+        k_line = data['trends'][-1].split(",")
+        # 上日收盘
+        pre_close = data["preClose"]
+        curr_price = float(k_line[2])
+        # 涨跌幅
+        change_rate = (curr_price - pre_close) / pre_close
+        return data["name"], float(curr_price), f"{change_rate:.2%}"
+    return None, None
 
 
 class StockApp:
     def __init__(self, master):
         self.master = master
         self.master.title("股票信息")
-        self.master.geometry("300x200")
-        self.stock_code = "000001"
+        self.master.geometry("500x300")
 
-        # 股票信息
-        self.stock_name = "创业板ETF"
-        self.timestamp = "2024-10-25 15:00"
-        self.current_price = 2.196
-        self.change_percentage = 3
+        # 创建 Treeview 小部件
+        tree = ttk.Treeview(root)
+        self.tree = tree
 
-        # 创建标签
-        self.label_title = tk.Label(master, text="股票信息", font=("Arial", 16))
-        self.label_title.pack(pady=10)
+        # 定义列
+        tree["columns"] = ("#1", "#2", "#3", "#4", "#5")
 
-        self.label_stock_name = tk.Label(master, text=f"股票名称：{self.stock_name}", font=("Arial", 12))
-        self.label_stock_name.pack(pady=5)
+        # 设置列标题
+        tree.heading("#0", text="序号")
+        tree.heading("#1", text="股票代码")
+        tree.heading("#2", text="股票名称")
+        tree.heading("#3", text="市场代码")
+        tree.heading("#4", text="涨跌幅")
+        tree.heading("#5", text="当前股价")
 
-        self.label_timestamp = tk.Label(master, text=f"时间：{self.timestamp}", font=("Arial", 12))
-        self.label_timestamp.pack(pady=5)
+        # 设置列宽度
+        tree.column("#0", width=50, minwidth=50, anchor=tk.CENTER)
+        tree.column("#1", width=100, minwidth=100, anchor=tk.CENTER)
+        tree.column("#2", width=100, minwidth=100, anchor=tk.CENTER)
+        tree.column("#3", width=60, minwidth=60, anchor=tk.CENTER)
+        tree.column("#4", width=60, minwidth=60, anchor=tk.CENTER)
+        tree.column("#5", width=60, minwidth=60, anchor=tk.CENTER)
 
-        self.label_current_price = tk.Label(master, text=f"当前价格：{self.current_price}", font=("Arial", 12))
-        self.label_current_price.pack(pady=5)
-
-        self.label_change_percentage = tk.Label(master, text=f"涨跌幅度：{self.change_percentage}%", font=("Arial", 12))
-        self.label_change_percentage.pack(pady=5)
+        # 将 Treeview 放置在主窗口中
+        tree.pack(expand=True, fill=tk.BOTH)
 
         # 启动线程以获取数据
         self.running = True
         threading.Thread(target=self.fetch_data, daemon=True).start()
 
     def fetch_data(self):
-        i = 0
+        item_dict = {}
+        j = 0
         while self.running:
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) '
-                              'Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0',
-                'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-            }
+            i = 0
+            j += 1
+            for stock in Stock:
+                name, price, change = get_socket_data(stock.market_code, stock.stock_code)
+                if stock not in item_dict:
+                    i += 1
+                    item = self.tree.insert("", tk.END, text=str(i),
+                                            values=(
+                                                stock.stock_code, name, market_dict[stock.market_code], change, price))
+                    item_dict[stock] = item
+                else:
+                    self.tree.item(item_dict[stock],
+                                   values=(stock.stock_code, name, market_dict[stock.market_code], change, price))
 
-            url = ("https://push2.eastmoney.com/api/qt/stock/trends2/get?secid=0." + self.stock_code + "&fields1=f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13&fields2=f51,f52,f53,f54,f55,f56,f57,f58&ut=fa5fd1943c7b386f172d6893dbfba10b&iscr=0&cb=cb_1729920299632_6004225&isqhquote=&cb_1729920299632_6004225=cb_1729920299632_6004225")
-            response = requests.get(url, headers=headers)
-
-            # 模拟从API获取JSON数据（替换为实际API URL）
-            if response.status_code == 200:
-                json_string = response.text.split('(', 1)[1].rsplit(')', 1)[0]
-                data = json.loads(json_string)
-                k_line = data['data']['trends'][-1].split(",")
-                curr_price = k_line[2]
-                self.update_display(float(curr_price), data['data']['decimal'])
-
-            # 每隔5秒更新一次
             time.sleep(1)
-
-    def update_display(self, new_price, new_change):
-        # 更新标签内容
-        self.current_price = new_price
-        self.change_percentage = new_change
-
-        self.label_current_price.config(text=f"当前价格：{self.current_price:.3f}")
-        self.label_change_percentage.config(text=f"涨跌幅度：{self.change_percentage:.2f}%")
 
     def on_closing(self):
         self.running = False
