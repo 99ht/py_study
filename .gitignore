@@ -1,0 +1,9 @@
+venv
+*.cfa
+*.exe
+*.xlsx
+*.spec
+*.h
+*.txt
+.idea
+*.ico
