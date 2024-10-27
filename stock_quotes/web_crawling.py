@@ -26,9 +26,8 @@ def get_socket_data(market_code, stock_code):
     response = requests.get(url, headers=headers)
     # 模拟从API获取JSON数据（替换为实际API URL）
     if response.status_code == 200:
-        # json_string = response.text.split('(', 1)[1].rsplit(')', 1)[0]
         json_string = response.text
-        json_obj = json.loads(json_string)
+        json_obj = json.loads(json_string) # 将字符串转为python的字典类型
 
         data = json_obj["data"]
         k_line = data['trends'][-1].split(",")
