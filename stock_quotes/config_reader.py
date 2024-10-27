@@ -1,6 +1,5 @@
+import csv
 import os
-
-import pandas as pd
 
 
 class CSVConfig:
@@ -9,7 +8,6 @@ class CSVConfig:
     def __init__(self, stock_code, market_code):
         self.stock_code = str(stock_code)
         self.market_code = str(market_code)
-        print(self.stock_code, self.market_code)
 
     def __hash__(self):
         # 使用 symbol 的哈希值作为 Stock 对象的哈希值
@@ -28,8 +26,13 @@ class CSVConfig:
     def __reload_config__():
         current_dir = os.getcwd()  # 这将是当前脚本的目录
         csv_file_path = os.path.join(current_dir, 'config.csv')
-        df = pd.read_csv(csv_file_path, dtype={'stockCode': str})
-        CSVConfig.stock_data = [CSVConfig(row['stockCode'], row['marketCode']) for index, row in df.iterrows()]
+
+        with open(csv_file_path, mode='r', encoding='utf-8') as file:
+            reader = csv.reader(file)
+            next(reader)
+            for row in reader:
+                CSVConfig.stock_data.append(CSVConfig(row[0], row[1]))
+
         return CSVConfig.stock_data
 
     @staticmethod
