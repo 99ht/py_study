@@ -92,7 +92,7 @@ class StockApp:
                 i += 1
                 self.update_table(i, data, item_dict)
 
-            time.sleep(1)
+            time.sleep(3)
 
     def update_table(self, i, data, item_dict):
         market_code, stock_code, name, price, change, change_price = data
