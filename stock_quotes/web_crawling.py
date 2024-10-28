@@ -27,7 +27,7 @@ def get_socket_data(market_code, stock_code):
     # 模拟从API获取JSON数据（替换为实际API URL）
     if response.status_code == 200:
         json_string = response.text
-        json_obj = json.loads(json_string) # 将字符串转为python的字典类型
+        json_obj = json.loads(json_string)  # 将字符串转为python的字典类型
 
         data = json_obj["data"]
         k_line = data['trends'][-1].split(",")
@@ -59,10 +59,8 @@ class StockApp:
         tree["columns"] = columns
 
         # 设置列标题
-        tree.heading("#0", text="序号")
         for col, header in zip(columns, headers):
             tree.heading(col, text=header)
-
         # 设置列宽度
         tree.column("#0", width=50, minwidth=50, anchor=tk.CENTER)
         tree.column("#1", width=100, minwidth=100, anchor=tk.CENTER)
@@ -71,6 +69,10 @@ class StockApp:
         tree.column("#4", width=60, minwidth=60, anchor=tk.CENTER)
         tree.column("#5", width=60, minwidth=60, anchor=tk.CENTER)
         tree.column("#6", width=60, minwidth=60, anchor=tk.CENTER)
+
+        # 配置标签,设置颜色
+        tree.tag_configure('green', foreground='green')
+        tree.tag_configure('red', foreground='red')
 
         # 将 Treeview 放置在主窗口中
         tree.pack(expand=True, fill=tk.BOTH)
@@ -101,13 +103,15 @@ class StockApp:
             item = self.tree.insert("", tk.END, text=str(i),
                                     values=(
                                         stock_code, name, market_dict[market_code], change, price,
-                                        change_price))
+                                        change_price),
+                                    tags=('green',) if float(change_price) < 0 else (('red',) if float(change_price) > 0 else ''))
             item_dict[key] = item
         else:
             self.tree.item(item_dict[key],
                            values=(
                                stock_code, name, market_dict[market_code], change, price,
-                               change_price))
+                               change_price),
+                           tags=('green',) if float(change_price) < 0 else (('red',) if float(change_price) > 0 else ''))
 
     def on_closing(self):
         self.running = False
