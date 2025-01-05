@@ -41,9 +41,16 @@ def get_cell_value(sheet_num, row_num, column_num):
 with open(tar_file_path, "w") as tar_file:
     for row in range(3, sheet.max_row + 1):
         # for column in range(1, sheet.max_column + 1):
-        name = get_cell_value(sheet, row, 6)
+        # name = get_cell_value(sheet, row, 6)
+        name = sheet.cell(row, 6).value
         if name is None:
             continue
-        value = get_cell_value(sheet, row, 5)
-        note = get_cell_value(sheet, row, 3)
+        value = sheet.cell(row, 5).value
+        note = sheet.cell(row, 3).value
+
+        # 获取特定单元格的值（例如 A1）
+        # cell_value = sheet['A1'].value
+
+        # value = get_cell_value(sheet, row, 5)
+        # note = get_cell_value(sheet, row, 3)
         tar_file.write("#define " + name + " " + value + " // " + note + "\r\n")
