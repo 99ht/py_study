@@ -1,6 +1,5 @@
 venv
 *.cfa
-*.exe
 *.xlsx
 *.spec
 *.h
@@ -9,3 +8,4 @@ venv
 *.ico
 build
 dist
+.gitignore
