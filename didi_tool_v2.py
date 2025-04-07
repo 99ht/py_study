@@ -1,5 +1,6 @@
 import pdfplumber
 import openpyxl as op
+import os
 from datetime import datetime
 
 def extract_and_merge_pdf_tables(pdf_path):
@@ -66,13 +67,24 @@ def adjust_custom_format(tables):
     return new_table
 
 
+#读取当前目录所有pdf文件
+def get_all_pdf_files():
+    current_directory = os.getcwd()
+    pdf_files = []
+    #print(os.listdir(current_directory))
+    for file in os.listdir(current_directory):
+        if file.lower().endswith('.pdf'):
+            pdf_file_path = os.path.join(current_directory, file)
+            pdf_files.append(pdf_file_path)
+    return pdf_files
 
-pdf_path = '滴滴出行行程报销单.pdf'  # 替换为你的 PDF 文件路径
-excel_path = '滴滴出行行程报销单.xlsx'  # 替换为你想要保存的 Excel 文件路径
-tables = extract_and_merge_pdf_tables(pdf_path)
-wb = op.Workbook()
-ws = wb['Sheet']  # 创建子表
-curr_year = datetime.now().year
-tables = adjust_custom_format(tables)
-wb.save(excel_path)
 
+pdf_files = get_all_pdf_files()
+for pdf_file in pdf_files:
+    tables = extract_and_merge_pdf_tables(pdf_file)
+    wb = op.Workbook()
+    ws = wb['Sheet']  # 创建子表
+    curr_year = datetime.now().year
+    tables = adjust_custom_format(tables)
+    excel_path = os.path.splitext(pdf_file)[0] + '.xlsx'  #需要生成的文件名
+    wb.save(excel_path)  # 替换为你想要保存的 Excel 文件路径
