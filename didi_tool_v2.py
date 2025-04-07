@@ -21,49 +21,53 @@ def extract_and_merge_pdf_tables(pdf_path):
                             merged_row.append(merged_cell)
                         else:
                             merged_row.append(None)
+                    ws.append(merged_row)
                     merged_table.append(merged_row)
             all_tables.append(merged_table)
     return all_tables
 
 def adjust_custom_format(tables):
-    new_table = []
-    for table in tables:
-        new_row = []
-        del table[0]
-        for row in table:
-            date = row[2][0:5]
-            del row[6]
-            del row[3]
-            del row[1]
-            del row[0]
-            row[0] = row[0][-2:]
-            row.insert(0, date)
-            row[2] = row[2] + "--" + row[3]
-            del row[3]
-            row.insert(2, "市内交通费")
-            row.insert(3, "外出岍丞支持项目")
-            row.insert(5, "增值税电子普通发票")
-            # 尝试将金额转换为浮点数
-            try:
-                row[6] = float(row[6])
-            except (ValueError, IndexError):
-                print(f"无法将 {row[6]} 转换为数字，跳过此行")
-                continue
-            try:
-                row[0] = f"{curr_year}年" + row[0].split('-')[0] + "月" + row[0].split('-')[1] + "日"
-                # row[0] = f"{curr_year}/" + row[0].split('-')[0] + "/" + row[0].split('-')[1]
-            except (ValueError, IndexError):
-                print(f"无法将 {row[0]} 转换为年月日，跳过此行")
-                continue
-            new_cell = []
-            #print(type(new_cell))
-            for cell in row:
-                #print(type(cell))
-                new_cell.append(cell)
-            ws.append(new_cell)
-            new_row.append(row)
-        new_table.append(new_row)
-    #print(new_table)
+    try:
+        new_table = []
+        for table in tables:
+            new_row = []
+            del table[0]
+            for row in table:
+                date = row[2][0:5]
+                del row[6]
+                del row[3]
+                del row[1]
+                del row[0]
+                row[0] = row[0][-2:]
+                row.insert(0, date)
+                row[2] = row[2] + "--" + row[3]
+                del row[3]
+                row.insert(2, "市内交通费")
+                row.insert(3, "外出岍丞支持项目")
+                row.insert(5, "增值税电子普通发票")
+                # 尝试将金额转换为浮点数
+                try:
+                    row[6] = float(row[6])
+                except (ValueError, IndexError):
+                    print(f"无法将 {row[6]} 转换为数字，跳过此行")
+                    continue
+                try:
+                    row[0] = f"{curr_year}年" + row[0].split('-')[0] + "月" + row[0].split('-')[1] + "日"
+                    # row[0] = f"{curr_year}/" + row[0].split('-')[0] + "/" + row[0].split('-')[1]
+                except (ValueError, IndexError):
+                    print(f"无法将 {row[0]} 转换为年月日，跳过此行")
+                    continue
+                new_cell = []
+                #print(type(new_cell))
+                for cell in row:
+                    #print(type(cell))
+                    new_cell.append(cell)
+                ws2.append(new_cell)
+                new_row.append(row)
+            new_table.append(new_row)
+        #print(new_table)
+    except Exception as e:  #捕获所有异常
+        print(f"存在无法转为特定格式表格的问题,EEROR错误类型：{e}");
     return new_table
 
 
@@ -81,10 +85,12 @@ def get_all_pdf_files():
 
 pdf_files = get_all_pdf_files()
 for pdf_file in pdf_files:
-    tables = extract_and_merge_pdf_tables(pdf_file)
     wb = op.Workbook()
-    ws = wb['Sheet']  # 创建子表
+    ws = wb.active  # 创建子表
+    ws.title = "从pdf提取的sheet"
+    ws2 = wb.create_sheet(title="按照固定格式生成的sheet")
+    output_excel_path = os.path.splitext(pdf_file)[0] + '.xlsx'  #需要生成的文件名
+    tables = extract_and_merge_pdf_tables(pdf_file)
     curr_year = datetime.now().year
     tables = adjust_custom_format(tables)
-    excel_path = os.path.splitext(pdf_file)[0] + '.xlsx'  #需要生成的文件名
-    wb.save(excel_path)  # 替换为你想要保存的 Excel 文件路径
+    wb.save(output_excel_path)  # 替换为你想要保存的 Excel 文件路径
