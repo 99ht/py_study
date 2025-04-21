@@ -47,7 +47,7 @@ def adjust_custom_format(tables):
                 row[2] = row[2] + "--" + row[3]
                 del row[3]
                 row.insert(2, "市内交通费")
-                row.insert(3, "外出岍丞支持项目")
+                row.insert(3, "外出XXXXX")
                 row.insert(5, "增值税电子普通发票")
                 # 尝试将金额转换为浮点数
                 try:
@@ -58,8 +58,8 @@ def adjust_custom_format(tables):
                 try:
                     row[0] = f"{curr_year}年" + row[0].split('-')[0] + "月" + row[0].split('-')[1] + "日"
                     # row[0] = f"{curr_year}/" + row[0].split('-')[0] + "/" + row[0].split('-')[1]
-                except (ValueError, IndexError):
-                    print(f"无法将 {row[0]} 转换为年月日，跳过此行")
+                except Exception as e:
+                    print(f"无法将 {row[0]} 转换为年月日，跳过此行,EEROR错误类型：{e}")
                     continue
                 new_cell = []
                 #print(type(new_cell))
@@ -68,8 +68,8 @@ def adjust_custom_format(tables):
                     new_cell.append(cell)
                 ws2.append(new_cell)
                 new_row.append(row)
-            new_table.append(new_row)
-        #print(new_table)
+            if new_row:
+                new_table.append(new_row)
     except Exception as e:  #捕获所有异常
         print(f"存在无法转为特定格式表格的问题,EEROR错误类型：{e}");
     return new_table
@@ -94,7 +94,7 @@ for pdf_file in pdf_files:
     ws.title = "从pdf提取的sheet"
     tables = extract_and_merge_pdf_tables(pdf_file)
     if tables: #没有table就不保存excel文件了
-        ws2 = wb.create_sheet(title="按照固定格式生成的sheet")
+        ws2 = wb.create_sheet(title="滴滴行程报销的特定sheet")
         output_excel_path = os.path.splitext(pdf_file)[0] + '.xlsx'  #需要生成的文件名
         curr_year = datetime.now().year
         costom_tables = adjust_custom_format(tables)
