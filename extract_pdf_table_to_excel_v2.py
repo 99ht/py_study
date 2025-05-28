@@ -8,8 +8,6 @@ import os
 from datetime import datetime
 import re
 
-null_line = [""]  #不同页以及不同的表需要用空行隔开(不同页隔2行,同页不同表隔1行)
-
 # 设置全局单元格样式
 alignment_style_auto_LF = Alignment(
     horizontal='left',  # 水平靠左
@@ -63,7 +61,7 @@ def auto_fit_columns(file_path):
                     pass
 
             # 设置列宽（加2单位缓冲）
-            adjusted_width = (max_length + 2)* 1.02  # 1.02是字体宽度系数
+            adjusted_width = (max_length + 2)* 1.03  # 1.03是字体宽度系数
             ws.column_dimensions[column_letter].width = min(adjusted_width, 120)  # 限制最大宽度
             # 应用到所有单元格
             for row in ws.iter_rows():
@@ -83,26 +81,23 @@ def auto_fit_columns(file_path):
 def extract_and_merge_pdf_tables(pdf_path):
     all_tables = []
     with pdfplumber.open(pdf_path) as pdf:
-        for page in pdf.pages:
+        for page_num, page in enumerate(pdf.pages):
+            #print(page_num)
             # 提取当前页的所有表格
             tables = page.extract_tables(settings)
-            for table in tables:  #对tables 列表里的每个表格进行遍历
+            for idx, table in enumerate(tables):  #对tables 列表里的每个表格进行遍历
+                ws2 = wb.create_sheet(title=f"Page{page_num + 1}_Table{idx + 1}")
                 merged_table = []
                 for row in table:  #对当前表格里的每一行进行遍历
+                    #print(len(row)) #列数
                     merged_row = []
                     for cell in row:  #对当前行里的每个单元格进行遍历
                         if cell is not None:
                             merged_cell = cell
                             merged_row.append(merged_cell)
-                        #else:
-                        #    merged_row.append(None)
-                    ws.append(merged_row)
+                    ws2.append(merged_row)
                     merged_table.append(merged_row)
-                    #print(merged_row)
-                ws.append(null_line)
-                ws.append(null_line)
                 all_tables.append(merged_table)
-            ws.append(null_line)
     return all_tables
 
 
@@ -122,9 +117,10 @@ pdf_files = get_all_pdf_files()
 for pdf_file in pdf_files:
     wb = op.Workbook()
     ws = wb.active  # 创建子表
-    ws.title = "从pdf提取的sheet"
+    #ws.title = "sheet"
     tables = extract_and_merge_pdf_tables(pdf_file)
     if tables:  #没有table就不保存excel文件了
+        wb.remove(ws)
         output_excel_path = os.path.splitext(pdf_file)[0] + '.xlsx'  #需要生成的文件名
         curr_year = datetime.now().year
         wb.save(output_excel_path)  # 替换为你想要保存的 Excel 文件路径
