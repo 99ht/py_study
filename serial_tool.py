@@ -121,6 +121,8 @@ class SerialWidget(QWidget):
         self.serial_port = None
         self.serial_thread = None
         self.custom_baudrate = 1500000  # 默认1.5M波特率
+        self.auto_save_enabled = False
+        self.auto_save_file_index = 1
         self.init_ui()
         self.load_config()
         
@@ -314,6 +316,27 @@ class SerialWidget(QWidget):
         # 状态栏
         self.status_label = QLabel('就绪')
         layout.addWidget(self.status_label)
+        
+    def set_auto_save_enabled(self, enabled):
+        self.auto_save_enabled = enabled
+        
+    def check_auto_save(self):
+        text = self.receive_text.toPlainText()
+        if len(text.encode('utf-8')) > 50 * 1024 * 1024:  # 50MB
+            # 自动保存到logs目录
+            logs_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs')
+            if not os.path.exists(logs_dir):
+                os.makedirs(logs_dir)
+            filename = f"串口{self.port_index}_autosave_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{self.auto_save_file_index}.txt"
+            file_path = os.path.join(logs_dir, filename)
+            try:
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    f.write(text)
+                self.auto_save_file_index += 1
+                self.receive_text.clear()
+                self.status_label.setText(f"自动保存到 {file_path}")
+            except Exception as e:
+                self.status_label.setText(f"自动保存失败: {e}")
         
     def on_baudrate_changed(self, value):
         """波特率选择变化时触发"""
@@ -569,6 +592,9 @@ class SerialWidget(QWidget):
                 self.filter_preview_text.append_smart(f"{processed_line}  {hex_line}")
             else:
                 self.filter_preview_text.append_smart(processed_line)
+            # 自动保存逻辑
+            if self.auto_save_enabled:
+                self.check_auto_save()
             return
             
         line_to_check = processed_line if case_sensitive else processed_line.lower()
@@ -579,6 +605,9 @@ class SerialWidget(QWidget):
             else:
                 self.filter_preview_text.append_smart(processed_line)
             print(f"[显示] 过滤数据: {processed_line}")
+        # 自动保存逻辑
+        if self.auto_save_enabled:
+            self.check_auto_save()
     
     def clear_display(self):
         """清空显示区域"""
@@ -719,6 +748,14 @@ class ConfigManager:
         """设置分割器大小"""
         self.config['splitter_sizes'] = sizes
         self.save_config()
+        
+    # 在ConfigManager类中添加
+    def get_auto_save_enabled(self):
+        return self.config.get('auto_save_enabled', False)
+
+    def set_auto_save_enabled(self, enabled):
+        self.config['auto_save_enabled'] = enabled
+        self.save_config()
 
 class DualSerialMonitor(QMainWindow):
     """双串口监控工具主窗口"""
@@ -738,10 +775,15 @@ class DualSerialMonitor(QMainWindow):
         main_layout = QVBoxLayout(central_widget)
         main_layout.setContentsMargins(2, 2, 2, 2)
         main_layout.setSpacing(2)
-        
         # 创建菜单栏
         menubar = self.menuBar()
         file_menu = menubar.addMenu('文件')
+        # 添加自动保存开关
+        self.auto_save_action = QAction('自动保存(>50MB)', self)
+        self.auto_save_action.setCheckable(True)
+        self.auto_save_action.setChecked(self.config_manager.get_auto_save_enabled())
+        self.auto_save_action.triggered.connect(self.toggle_auto_save)
+        file_menu.addAction(self.auto_save_action)
         
         # 添加保存动作
         save_all_original_action = QAction('保存所有原始数据', self)
@@ -772,6 +814,9 @@ class DualSerialMonitor(QMainWindow):
         
         # 状态栏
         self.statusBar().showMessage('就绪 - 支持2个串口同时监控')
+        
+        for widget in self.serial_widgets:
+            widget.set_auto_save_enabled(self.auto_save_action.isChecked())
     
     def save_all_original_data(self):
         """保存所有串口的原始数据"""
@@ -782,7 +827,12 @@ class DualSerialMonitor(QMainWindow):
         """保存所有串口的过滤数据"""
         for i, widget in enumerate(self.serial_widgets):
             widget.save_filtered_data()
-    
+    def toggle_auto_save(self, checked):
+        self.config_manager.set_auto_save_enabled(checked)
+        # 通知所有串口窗口
+        for widget in self.serial_widgets:
+            widget.set_auto_save_enabled(checked)
+        
     def load_window_config(self):
         """加载窗口配置"""
         # 加载窗口大小和位置
