@@ -352,7 +352,8 @@ class SerialWidget(QWidget):
         
     def check_auto_save(self):
         text = self.receive_text.toPlainText()
-        if len(text.encode('utf-8')) > 50 * 1024 * 1024:  # 50MB
+        limit_mb = self.config_manager.get_auto_save_limit_mb()
+        if len(text.encode('utf-8')) > limit_mb * 1024 * 1024:
             # 自动保存到logs目录
             logs_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs')
             if not os.path.exists(logs_dir):
@@ -830,6 +831,13 @@ class ConfigManager:
         self.config['auto_save_enabled'] = enabled
         self.save_config()
 
+    def get_auto_save_limit_mb(self):
+        return self.config.get('auto_save_limit_mb', 50)
+
+    def set_auto_save_limit_mb(self, mb):
+        self.config['auto_save_limit_mb'] = mb
+        self.save_config()
+
 class DualSerialMonitor(QMainWindow):
     """双串口监控工具主窗口"""
     def __init__(self):
@@ -852,11 +860,15 @@ class DualSerialMonitor(QMainWindow):
         menubar = self.menuBar()
         file_menu = menubar.addMenu('文件')
         # 添加自动保存开关
-        self.auto_save_action = QAction('自动保存(>50MB)', self)
+        self.auto_save_action = QAction('自动保存', self)
         self.auto_save_action.setCheckable(True)
         self.auto_save_action.setChecked(self.config_manager.get_auto_save_enabled())
         self.auto_save_action.triggered.connect(self.toggle_auto_save)
         file_menu.addAction(self.auto_save_action)
+        # 添加设置自动保存容量
+        set_limit_action = QAction('设置自动保存容量', self)
+        set_limit_action.triggered.connect(self.set_auto_save_limit)
+        file_menu.addAction(set_limit_action)
         
         # 添加保存动作
         save_all_original_action = QAction('保存所有原始数据', self)
@@ -942,6 +954,13 @@ class DualSerialMonitor(QMainWindow):
                 widget.close_serial()
         
         event.accept()
+
+    def set_auto_save_limit(self):
+        cur = self.config_manager.get_auto_save_limit_mb()
+        val, ok = QInputDialog.getInt(self, '设置自动保存容量', '请输入自动保存容量（MB）:', cur, 1, 1024, 1)
+        if ok:
+            self.config_manager.set_auto_save_limit_mb(val)
+            QMessageBox.information(self, '设置成功', f'自动保存容量已设为{val}MB')
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
