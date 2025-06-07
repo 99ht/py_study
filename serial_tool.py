@@ -8,7 +8,7 @@ from datetime import datetime
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                             QHBoxLayout, QLabel, QComboBox, QPushButton, 
                             QTextEdit, QLineEdit, QCheckBox, QMessageBox,
-                            QInputDialog, QSplitter, QFileDialog, QAction)
+                            QInputDialog, QSplitter, QFileDialog, QAction, QDialog, QFormLayout, QDialogButtonBox, QSpinBox)
 from PyQt5.QtCore import QThread, pyqtSignal, Qt
 from PyQt5.QtGui import QTextCursor, QFont
 
@@ -134,6 +134,10 @@ class SerialWidget(QWidget):
         self.custom_baudrate = 1500000  # 默认1.5M波特率
         self.auto_save_enabled = False
         self.auto_save_file_index = 1
+        self.data_bits = 8
+        self.stop_bits = 1
+        self.parity = 'None'
+        self.flow_control = 'None'
         self.init_ui()
         self.load_config()
         
@@ -184,16 +188,15 @@ class SerialWidget(QWidget):
         # 添加信号槽连接，当波特率选择变化时触发更新
         self.baudrate_combo.currentTextChanged.connect(self.on_baudrate_changed)
         
-        self.custom_baudrate_btn = QPushButton('自定义波特率')
-        self.custom_baudrate_btn.setMinimumWidth(150)
-        self.custom_baudrate_btn.setMaximumWidth(150)
-        self.custom_baudrate_btn.clicked.connect(self.set_custom_baudrate)
-        settings_layout.addWidget(self.custom_baudrate_btn, 1)
-        # 设置关闭状态的样式（蓝色背景，白色文字）
-        self.custom_baudrate_btn.setStyleSheet("""
+        self.more_settings_btn = QPushButton('⚙️ 更多设置')
+        self.more_settings_btn.setMinimumWidth(150)
+        self.more_settings_btn.setMaximumWidth(150)
+        self.more_settings_btn.clicked.connect(self.show_more_settings_dialog)
+        settings_layout.addWidget(self.more_settings_btn, 1)
+        self.more_settings_btn.setStyleSheet("""
             QPushButton {
-                font-weight: bold;  /* 加粗 */
-                background-color: #46b1fa; /* 初始为蓝色（关闭状态） */
+                font-weight: bold;
+                background-color: #46b1fa;
                 color: white;
             }
             QPushButton:hover {
@@ -445,53 +448,82 @@ class SerialWidget(QWidget):
             # 打开串口（注意：open_serial内部会处理样式）
             self.open_serial()
     
-    def set_custom_baudrate(self):
-        """设置自定义波特率"""
-        current_baudrate = self.baudrate_combo.currentText()
-        baudrate, ok = QInputDialog.getInt(
-            self, 
-            f'串口 {self.port_index} 自定义波特率', 
-            '输入波特率:', 
-            value=int(current_baudrate),
-            min=1, 
-            max=2000000, 
-            step=1
-        )
-        
-        if ok:
-            # 更新下拉框选择
-            self.baudrate_combo.setCurrentText(str(baudrate))
-            # 应用波特率更改
-            self.apply_baudrate_change(str(baudrate))
-    
+    def show_more_settings_dialog(self):
+        dialog = QDialog(self)
+        dialog.setWindowTitle(f'串口{self.port_index} 更多设置')
+        layout = QFormLayout(dialog)
+        # 波特率
+        baudrate_spin = QSpinBox()
+        baudrate_spin.setRange(1, 2000000)
+        baudrate_spin.setValue(self.custom_baudrate)
+        layout.addRow('自定义波特率:', baudrate_spin)
+        # 数据位
+        databits_combo = QComboBox()
+        databits_combo.addItems(['5', '6', '7', '8'])
+        databits_combo.setCurrentText(str(self.data_bits))
+        layout.addRow('数据位:', databits_combo)
+        # 停止位
+        stopbits_combo = QComboBox()
+        stopbits_combo.addItems(['1', '1.5', '2'])
+        stopbits_combo.setCurrentText(str(self.stop_bits))
+        layout.addRow('停止位:', stopbits_combo)
+        # 校验
+        parity_combo = QComboBox()
+        parity_combo.addItems(['None', 'Even', 'Odd', 'Mark', 'Space'])
+        parity_combo.setCurrentText(self.parity)
+        layout.addRow('校验:', parity_combo)
+        # 流控
+        flow_combo = QComboBox()
+        flow_combo.addItems(['None', 'RTS/CTS', 'XON/XOFF'])
+        flow_combo.setCurrentText(self.flow_control)
+        layout.addRow('流控:', flow_combo)
+        # 按钮
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        layout.addRow(buttons)
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        if dialog.exec_() == QDialog.Accepted:
+            self.custom_baudrate = baudrate_spin.value()
+            self.data_bits = int(databits_combo.currentText())
+            self.stop_bits = float(stopbits_combo.currentText())
+            self.parity = parity_combo.currentText()
+            self.flow_control = flow_combo.currentText()
+            self.baudrate_combo.setCurrentText(str(self.custom_baudrate))
+            self.config_manager.set_port_config(self.port_index, self.get_config())
+            if self.serial_port and self.serial_port.is_open:
+                self.close_serial()
+                self.open_serial()
+
     def open_serial(self):
         """打开串口"""
         try:
-            # 获取串口设置
             port_name = self.port_combo.currentText().split('-')[0]
             if not port_name:
                 self.status_label.setText('请选择有效串口')
                 QMessageBox.warning(self, '警告', '请先选择一个有效串口')
                 return
-                    
-            # 确定波特率
-            if self.custom_baudrate is not None:
-                baudrate = self.custom_baudrate
-            else:
-                baudrate = int(self.baudrate_combo.currentText())
-            
+            baudrate = self.custom_baudrate if self.custom_baudrate is not None else int(self.baudrate_combo.currentText())
+            data_bits = self.data_bits
+            stop_bits = self.stop_bits
+            parity = self.parity
+            flow_control = self.flow_control
+            # 转换为pyserial参数
+            bytesize = {5: serial.FIVEBITS, 6: serial.SIXBITS, 7: serial.SEVENBITS, 8: serial.EIGHTBITS}[data_bits]
+            stopbits = {1: serial.STOPBITS_ONE, 1.5: serial.STOPBITS_ONE_POINT_FIVE, 2: serial.STOPBITS_TWO}[stop_bits]
+            parity_map = {'None': serial.PARITY_NONE, 'Even': serial.PARITY_EVEN, 'Odd': serial.PARITY_ODD, 'Mark': serial.PARITY_MARK, 'Space': serial.PARITY_SPACE}
+            parity_val = parity_map.get(parity, serial.PARITY_NONE)
             # 打开串口前先关闭可能存在的旧串口连接
             if self.serial_port and self.serial_port.is_open:
                 self.serial_port.close()
-            
-            # 打开串口
             self.serial_port = serial.Serial(
                 port=port_name,
                 baudrate=baudrate,
-                bytesize=8,
-                stopbits=serial.STOPBITS_ONE,
-                parity=serial.PARITY_NONE,
-                timeout=0.1
+                bytesize=bytesize,
+                stopbits=stopbits,
+                parity=parity_val,
+                timeout=0.1,
+                rtscts=(flow_control == 'RTS/CTS'),
+                xonxoff=(flow_control == 'XON/XOFF')
             )
             
             if self.serial_port.is_open:
@@ -687,15 +719,20 @@ class SerialWidget(QWidget):
     
     def get_config(self):
         """获取当前配置（新增时间戳开关状态）"""
-        return {
+        cfg = {
             'port': self.port_combo.currentText(),
             'baudrate': self.baudrate_combo.currentText(),
             'custom_baudrate': self.custom_baudrate,
             'filter_text': self.filter_edit.text(),
             'filter_case': self.filter_case_checkbox.isChecked(),
             'show_hex': self.show_hex_checkbox.isChecked(),
-            'show_timestamp': self.show_timestamp_checkbox.isChecked(),  # 新增
+            'show_timestamp': self.show_timestamp_checkbox.isChecked(),
+            'data_bits': self.data_bits,
+            'stop_bits': self.stop_bits,
+            'parity': self.parity,
+            'flow_control': self.flow_control,
         }
+        return cfg
     
     def load_config(self):
         """加载配置（新增时间戳开关状态）"""
@@ -715,6 +752,10 @@ class SerialWidget(QWidget):
                 
                 # 设置自定义波特率
                 self.custom_baudrate = config.get('custom_baudrate', 1500000)
+                self.data_bits = config.get('data_bits', 8)
+                self.stop_bits = config.get('stop_bits', 1)
+                self.parity = config.get('parity', 'None')
+                self.flow_control = config.get('flow_control', 'None')
                 
                 # 设置过滤配置
                 self.filter_edit.setText(config.get('filter_text', ''))
