@@ -63,12 +63,16 @@ class SmartTextEdit(QTextEdit):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.auto_scroll = True
+        self._force_next_scroll = False  # 新增
         self.setReadOnly(True)
-        self.setUndoRedoEnabled(False)  # 禁用撤销/重做以提高性能
+        self.setUndoRedoEnabled(False)
         self.verticalScrollBar().valueChanged.connect(self.on_scroll_changed)
         
     def on_scroll_changed(self, value):
-        """滚动条变化时更新自动滚动状态"""
+        if self._force_next_scroll:
+            self._force_next_scroll = False
+            self.auto_scroll = True
+            return
         scrollbar = self.verticalScrollBar()
         self.auto_scroll = (value == scrollbar.maximum())
     
@@ -82,6 +86,13 @@ class SmartTextEdit(QTextEdit):
         if was_at_bottom or scrollbar.maximum() == 0:
             self.moveCursor(QTextCursor.End)
             self.auto_scroll = True
+
+    def force_auto_scroll(self):
+        """强制恢复自动滚动并滚动到底部"""
+        self._force_next_scroll = True
+        self.moveCursor(QTextCursor.End)
+        self.verticalScrollBar().setValue(self.verticalScrollBar().maximum())
+        self.auto_scroll = True
 
 # 在SerialWidget类定义之前添加以下代码
 class RefreshComboBox(QComboBox):
@@ -264,11 +275,28 @@ class SerialWidget(QWidget):
         left_buttons_layout.addWidget(self.save_original_btn)
         left_buttons_layout.addWidget(self.save_filtered_btn)
         
-        # 右侧：清空数据和自动滚动按钮
+        # 右侧：恢复自动滚动和清空数据按钮（顺序对调）
         right_buttons_layout = QHBoxLayout()
         right_buttons_layout.setContentsMargins(0, 0, 0, 0)
         right_buttons_layout.setSpacing(2)
-        
+
+        # 恢复自动滚动按钮
+        self.restore_scroll_btn = QPushButton('↩️ 恢复自动滚动')
+        self.restore_scroll_btn.setMinimumWidth(140)
+        self.restore_scroll_btn.setMinimumHeight(30)
+        self.restore_scroll_btn.clicked.connect(self.restore_auto_scroll)
+        self.restore_scroll_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #46b1fa;
+                color: white;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #199bf5;
+            }
+        """)
+        right_buttons_layout.addWidget(self.restore_scroll_btn)
+
         # 清空数据按钮
         self.clear_btn = QPushButton('🗑️ 清空数据')
         self.clear_btn.setMinimumWidth(100)
@@ -284,9 +312,8 @@ class SerialWidget(QWidget):
                 background-color: #fa5858;
             }
         """)
-        
         right_buttons_layout.addWidget(self.clear_btn)
-        
+
         # 将左右按钮布局添加到主控制布局
         control_layout.addLayout(left_buttons_layout, 1)  # 左侧布局占1份
         control_layout.addStretch(1)                     # 中间弹簧占1份
@@ -696,6 +723,11 @@ class SerialWidget(QWidget):
                 self.show_timestamp_checkbox.setChecked(config.get('show_timestamp', True))  # 新增
             except Exception as e:
                 print(f"加载串口{self.port_index}配置失败: {e}")
+
+    def restore_auto_scroll(self):
+        """恢复自动滚动"""
+        self.receive_text.force_auto_scroll()
+        self.filter_preview_text.force_auto_scroll()
 
 class ConfigManager:
     """配置管理器"""
