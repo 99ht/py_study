@@ -10,7 +10,7 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                             QTextEdit, QLineEdit, QCheckBox, QMessageBox,
                             QInputDialog, QSplitter, QFileDialog, QAction, QDialog, QFormLayout, QDialogButtonBox, QSpinBox)
 from PyQt5.QtCore import QThread, pyqtSignal, Qt
-from PyQt5.QtGui import QTextCursor, QFont
+from PyQt5.QtGui import QTextCursor, QFont, QIcon
 
 class SerialThread(QThread):
     """串口数据接收线程"""
@@ -843,7 +843,7 @@ class DualSerialMonitor(QMainWindow):
     def __init__(self):
         super().__init__()
         self.config_manager = ConfigManager()
-        self.setWindowTitle('双串口数据监控工具')
+        self.setWindowTitle('SerialToolFree')
         # 使用更合理的初始大小
         self.resize(500, 1000) #初始宽度
         self.init_ui()
@@ -962,8 +962,19 @@ class DualSerialMonitor(QMainWindow):
             self.config_manager.set_auto_save_limit_mb(val)
             QMessageBox.information(self, '设置成功', f'自动保存容量已设为{val}MB')
 
+def get_icon_path():
+    """获取图标路径（兼容开发环境和打包后环境）"""
+    if getattr(sys, 'frozen', False):
+        # 打包后路径（PyInstaller的_MEIPASS目录）
+        return os.path.join(sys._MEIPASS, "favicon.ico")
+    else:
+        # 开发环境路径（与脚本同目录）
+        return os.path.join(os.path.dirname(os.path.abspath(__file__)), "favicon.ico")
+
 if __name__ == '__main__':
     app = QApplication(sys.argv)
+    icon_path = get_icon_path()
+    app.setWindowIcon(QIcon(icon_path))
     # 设置全局字体
     font = QFont("微软雅黑", 10)  # 字体名称和大小
     app.setFont(font)
