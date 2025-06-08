@@ -2,7 +2,7 @@ import sys
 import time
 import json
 import os
-import serial
+import serial #pip install pyserial
 import serial.tools.list_ports
 from datetime import datetime
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
