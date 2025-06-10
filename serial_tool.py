@@ -40,7 +40,7 @@ class SerialThread(QThread):
                         
                         # 处理完整的行
                         self.process_buffer()
-                time.sleep(0.01)  # 避免CPU占用过高
+                time.sleep(0.002)  # 避免CPU占用过高
             except Exception as e:
                 self.data_received.emit(f"串口错误: {str(e)}\n", self.port_index)
                 self.running = False
@@ -353,9 +353,16 @@ class SerialWidget(QWidget):
     def check_auto_save(self):
         text = self.receive_text.toPlainText()
         limit_mb = self.config_manager.get_auto_save_limit_mb()
-        if len(text.encode('utf-8')) > limit_mb * 1024 * 1024:
-            # 自动保存到logs目录
-            logs_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs')
+        if len(text.encode('utf-8')) > limit_mb * 1024: #* 1024:
+            # 自动保存到logs目录 兼容开发环境和打包后环境）
+            if getattr(sys, 'frozen', False):
+                # 打包后：使用exe所在目录
+                base_dir = os.path.dirname(os.path.abspath(sys.executable))
+            else:
+                # 开发环境：使用脚本所在目录
+                base_dir = os.path.dirname(os.path.abspath(__file__))
+
+            logs_dir = os.path.join(base_dir, 'logs')
             if not os.path.exists(logs_dir):
                 os.makedirs(logs_dir)
             filename = f"串口{self.port_index}_autosave_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{self.auto_save_file_index}.txt"
@@ -957,10 +964,10 @@ class DualSerialMonitor(QMainWindow):
 
     def set_auto_save_limit(self):
         cur = self.config_manager.get_auto_save_limit_mb()
-        val, ok = QInputDialog.getInt(self, '设置自动保存容量', '请输入自动保存容量（MB）:', cur, 1, 1024, 1)
+        val, ok = QInputDialog.getInt(self, '设置触发自动保存容量阈值', '请输入自动保存容量阈值（KB）:', cur, 1, 1024 * 1024, 1)
         if ok:
             self.config_manager.set_auto_save_limit_mb(val)
-            QMessageBox.information(self, '设置成功', f'自动保存容量已设为{val}MB')
+            QMessageBox.information(self, '设置成功', f'自动保存容量已设为{val}KB')
 
 def get_icon_path():
     """获取图标路径（兼容开发环境和打包后环境）"""
