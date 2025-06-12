@@ -616,6 +616,16 @@ class SerialWidget(QWidget):
             self.status_label.setText('已关闭')
             self.open_close_btn.setText('打开')
     
+    def html_escape(text):
+        """将特殊字符转义为HTML实体"""
+        return (
+            text.replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace('"', "&quot;")
+                .replace("'", "&#39;")
+        )
+
     def handle_data(self, data, port_index):
         """处理接收到的数据，修复>字符转义问题"""
         # 获取过滤设置

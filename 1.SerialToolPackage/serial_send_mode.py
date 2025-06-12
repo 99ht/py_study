@@ -552,7 +552,7 @@ class SerialSendMode(QMainWindow):
             text_data = data.encode().decode('utf-8')
         except UnicodeDecodeError:
             text_data = data
-        
+
         if self.hex_display_checkbox.isChecked():
             try:
                 hex_data = ' '.join([f'{b:02X}' for b in data.encode('utf-8')])
@@ -561,12 +561,18 @@ class SerialSendMode(QMainWindow):
                 display_data = data
         else:
             display_data = text_data
-        
+
+        # 关键修复：移除对>的转义，仅保留必要的转义（如<）
+        display_data = data.rstrip('\n')
+        # 仅转义<（如果需要），删除对>的转义
+        display_data = display_data.replace('<', '&lt;')  # 保留<的转义（可选）
+
         if self.timestamp_checkbox.isChecked():
             ts = datetime.now().strftime('%H:%M:%S.%f')[:-3]
             self.receive_text.append(f"<span style='color:#888888;'>[RX {ts}]</span> {display_data.strip()}")
         else:
             self.receive_text.append(f"[RX] {display_data.strip()}")
+
 
     def send_text_data(self):
         if not self.serial_port or not self.serial_port.is_open:
