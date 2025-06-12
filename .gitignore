@@ -1,11 +1,9 @@
 venv
 *.cfa
 *.xlsx
-*.spec
 *.h
 *.txt
 .idea
-*.ico
 build
 dist
 .gitignore
