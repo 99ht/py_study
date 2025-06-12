@@ -505,7 +505,7 @@ class SerialWidget(QWidget):
     def open_serial(self):
         """打开串口"""
         try:
-            port_name = self.port_combo.currentText().split('-')[0]
+            port_name = self.port_combo.currentText().split('-')[0].strip()
             if not port_name:
                 self.status_label.setText('请选择有效串口')
                 QMessageBox.warning(self, '警告', '请先选择一个有效串口')

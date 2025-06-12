@@ -2,6 +2,7 @@ import os
 import serial
 import serial.tools.list_ports
 import json
+import time
 from datetime import datetime
 from PyQt5.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTextEdit, 
                              QCheckBox, QLabel, QLineEdit, QComboBox, QListWidget, QListWidgetItem, 
@@ -71,17 +72,38 @@ class SerialReaderThread(QThread):
         super().__init__()
         self.serial_port = serial_port
         self.running = True
+        self.buffer = ""  # 数据缓冲区
 
     def run(self):
+        self.running = True
         while self.running:
-            if self.serial_port.in_waiting:
-                data = self.serial_port.read(self.serial_port.in_waiting)
-                try:
-                    decoded = data.decode('utf-8')
-                except:
-                    decoded = data.hex(' ')
-                self.data_received.emit(decoded)
-            self.msleep(10)
+            try:
+                if self.serial_port and self.serial_port.is_open:
+                    if self.serial_port.in_waiting:
+                        data = self.serial_port.read(self.serial_port.in_waiting)
+                        try:
+                            data_str = data.decode('utf-8')
+                        except UnicodeDecodeError:
+                            data_str = data.decode('gbk', errors='replace')
+
+                        # 将新数据添加到缓冲区
+                        self.buffer += data_str
+
+                        # 处理完整的行
+                        self.process_buffer()
+                time.sleep(0.002)  # 避免CPU占用过高
+            except Exception as e:
+                self.data_received.emit(f"串口错误{e}\n")
+                self.running = False
+
+    def process_buffer(self):
+        """处理缓冲区中的数据，只发送完整的行"""
+        while '\n' in self.buffer:
+            line, self.buffer = self.buffer.split('\n', 1)
+
+            # 只发送非空行
+            if line.strip():
+                self.data_received.emit(line.strip() + '\n')
 
     def stop(self):
         self.running = False
@@ -487,7 +509,7 @@ class SerialSendMode(QMainWindow):
             """)
         else:
             try:
-                port = self.port_combo.currentText()
+                port = self.port_combo.currentText().split('-')[0].strip()
                 baud = self.custom_baudrate
                 bytesize = {5: serial.FIVEBITS, 6: serial.SIXBITS, 7: serial.SEVENBITS, 8: serial.EIGHTBITS}[self.data_bits]
                 stopbits = {1: serial.STOPBITS_ONE, 1.5: serial.STOPBITS_ONE_POINT_FIVE, 2: serial.STOPBITS_TWO}[self.stop_bits]
@@ -735,6 +757,7 @@ class SerialSendMode(QMainWindow):
                 
             self.config_manager.set_custom_commands(commands)
             print("配置已保存")
+            self.close_serial();
             
         except Exception as e:
             print(f"保存配置时出错: {e}")
@@ -801,6 +824,11 @@ class SerialSendMode(QMainWindow):
         if self.serial_port and self.serial_port.is_open:
             self.serial_port.close()
         event.accept()
+
+    def close_serial(self):
+        """关闭串口"""
+        if self.serial_port and self.serial_port.is_open:
+            self.serial_port.close()
 
 
 class SerialTool(QMainWindow):
